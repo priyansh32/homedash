@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>sysdash • Home Lab Monitor</title>
+  <style>
+    /* ---------- Theme Tokens ---------- */
+    :root {
+      color-scheme: light dark;
+      --bg: #0b0d10;
+      --card: #10141b;
+      --card-2: #0d1117;
+      --text: #e6e9ef;
+      --muted: #9aa3af;
+      --line: #2a2f36;
+      --ring: #3b82f6;
+      --ok: #22c55e; 
+      --bad: #ef4444;
+      --warn: #f59e0b;
+      --accent-1: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
+      --accent-2: linear-gradient(135deg, #a78bfa 0%, #06b6d4 100%);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root { --bg: #f7f8fb; --card: #ffffff; --card-2: #ffffff; --text:#0b1220; --muted:#61708a; --line:#e5e7eb; }
+    }
+
+    html, body { height: 100%; }
+    body { margin: 0; background: radial-gradient(1200px 600px at 10% -10%, #2563eb22, transparent 50%),
+                                  radial-gradient(1000px 500px at 120% 10%, #06b6d422, transparent 50%),
+                                  var(--bg);
+           color: var(--text);
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+    /* ---------- Header ---------- */
+    .header {
+      position: sticky; top: 0; z-index: 20;
+      backdrop-filter: saturate(1.2) blur(8px);
+      background: color-mix(in hsl, var(--bg) 85%, transparent);
+      border-bottom: 1px solid var(--line);
+    }
+    .header-inner { display: flex; align-items: center; gap: 16px; padding: 14px 24px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.3px; }
+    .brand .logo { width:28px; height:28px; border-radius:8px; background: var(--accent-1); box-shadow: 0 6px 24px #2563eb55; }
+    .sub { color: var(--muted); font-size: .95rem; }
+
+    /* ---------- Toolbar ---------- */
+    .toolbar { margin-left: auto; display: flex; gap: 10px; }
+    .btn { appearance: none; border: 1px solid var(--line); color: var(--text); background: var(--card);
+           padding: 8px 12px; border-radius: 10px; cursor: pointer; transition: .2s ease; font-weight: 600; }
+    .btn:hover { border-color: #3b82f6aa; box-shadow: 0 6px 20px #3b82f622; transform: translateY(-1px); }
+    .btn.primary { background: var(--accent-1); border-color: transparent; color: #fff; }
+
+    /* ---------- Grid & Cards ---------- */
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(12, 1fr); align-items: stretch; }
+    .card { background: linear-gradient(180deg, color-mix(in hsl, var(--card) 92%, transparent), color-mix(in hsl, var(--card-2) 92%, transparent));
+            border: 1px solid var(--line); border-radius: 16px; padding: 16px; box-shadow: 0 10px 30px #0003; position: relative; overflow: clip; }
+    .card h3 { margin: 0 0 8px; font-size: 1rem; letter-spacing: .2px; }
+    .card .hint { color: var(--muted); font-size: .85rem; margin-top: 4px; }
+    .glow::after { content:""; position:absolute; inset:-1px; border-radius:16px; pointer-events:none; box-shadow: 0 0 0 1px #ffffff08, 0 0 60px #3b82f61a; }
+
+    /* ---------- Layout areas ---------- */
+    .span-6 { grid-column: span 6; }
+    .span-4 { grid-column: span 4; }
+    .span-3 { grid-column: span 3; }
+    .span-12 { grid-column: 1 / -1; }
+    @media (max-width: 900px) {
+      .span-6, .span-4, .span-3 { grid-column: 1 / -1; }
+    }
+
+    /* ---------- Tables ---------- */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 8px; border-bottom: 1px dashed color-mix(in hsl, var(--line) 70%, transparent); text-align: left; }
+    th { color: var(--muted); font-weight: 600; letter-spacing:.2px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+
+    /* ---------- Status pills ---------- */
+    .pill { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius: 999px; padding: 6px 10px; font-size:.9rem; background: color-mix(in hsl, var(--card) 85%, transparent); }
+    .ok { color: var(--ok); }
+    .bad { color: var(--bad); }
+    .warn { color: var(--warn); }
+
+    /* ---------- Charts ---------- */
+    canvas { width: 100%; height: 220px; display:block; }
+
+    /* ---------- Meta strip ---------- */
+    #meta { margin-top: 6px; font-size: .95rem; }
+
+    /* ---------- Footer ---------- */
+    .footer { color: var(--muted); text-align:center; padding: 28px 0 8px; font-size:.9rem; }
+
+    /* ---------- Skeletons (while app.js loads) ---------- */
+    .skeleton { position: relative; overflow: hidden; background: color-mix(in hsl, var(--card) 85%, transparent); min-height: 220px; border-radius: 12px; }
+    /* .skeleton::after { content:""; position: absolute; inset:0; background: linear-gradient(90deg, transparent, #ffffff10, transparent); animation: shimmer 1.6s infinite; } */
+    @keyframes shimmer { 0%{ transform: translateX(-100%)} 100%{ transform: translateX(100%)} }
+  </style>
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-inner container">
+      <div class="brand" aria-label="sysdash brand">
+        <div class="logo" aria-hidden="true"></div>
+        <div>
+          <div>sysdash</div>
+          <div class="sub mono" id="meta">Loading system meta…</div>
+        </div>
+      </div>
+
+      <!-- <div class="toolbar">
+        <button class="btn" id="themeToggle" title="Toggle theme">Theme</button>
+        <button class="btn" onclick="location.reload()" title="Refresh now">Refresh</button>
+        <a class="btn primary" href="#" onclick="navigator.clipboard?.writeText(location.href)" title="Copy dashboard URL">Share</a>
+      </div> -->
+    </div>
+  </div>
+
+  <!-- Main -->
+  <main class="container" style="padding-top:18px">
+    <div class="grid" role="region" aria-label="Charts and stats">
+      <section class="card glow span-6" aria-labelledby="cpuTitle">
+        <h3 id="cpuTitle">CPU %</h3>
+        <div class="hint">Realtime usage of all cores</div>
+        <div class="skeleton" id="cpuSkeleton"><canvas id="cpuChart"></canvas></div>
+      </section>
+
+      <section class="card glow span-6" aria-labelledby="memTitle">
+        <h3 id="memTitle">Memory</h3>
+        <div class="hint">Used vs available</div>
+        <div class="skeleton" id="memSkeleton"><canvas id="memChart"></canvas></div>
+      </section>
+
+      <section class="card span-4" aria-labelledby="loadTitle">
+        <h3 id="loadTitle">Load Avg</h3>
+        <div class="hint">1, 5 and 15 minute averages</div>
+        <div class="skeleton" id="loadSkeleton"><canvas id="loadChart"></canvas></div>
+      </section>
+
+      <section class="card span-4" aria-labelledby="netTitle">
+        <h3 id="netTitle">Network (bytes)</h3>
+        <div class="hint">RX and TX totals</div>
+        <div class="skeleton" id="netSkeleton"><canvas id="netChart"></canvas></div>
+      </section>
+
+      <section class="card span-4" aria-labelledby="tempsTitle">
+        <h3 id="tempsTitle">Temps</h3>
+        <div class="hint">CPU and sensors</div>
+        <div id="temps" class="mono">Loading…</div>
+      </section>
+
+      <!-- <section class="card span-6" aria-labelledby="disksTitle">
+        <h3 id="disksTitle">Disks</h3>
+        <div class="hint">Capacity and usage per mount</div>
+        <div id="disks" class="mono">Loading…</div>
+      </section> -->
+
+      <section class="card span-6" aria-labelledby="ifTitle">
+        <h3 id="ifTitle">Interfaces</h3>
+        <div class="hint">IP addresses and speeds</div>
+        <div id="netTbl" class="mono">Loading…</div>
+      </section>
+
+      <section class="card span-12" style="display:flex; gap:14px; align-items:center; justify-content:space-between">
+        <div class="pill"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10A10.011 10.011 0 0 0 12 2Zm5 9h-4V6a1 1 0 0 0-2 0v6a1 1 0 0 0 1 1h5a1 1 0 0 0 0-2Z" fill="currentColor"/></svg> Uptime <span id="uptime" class="mono">—</span></div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap">
+          <span class="pill ok">Healthy</span>
+          <span class="pill warn" id="warnPill" style="display:none">Warnings</span>
+          <span class="pill bad" id="badPill" style="display:none">Attention</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Theme toggle script kept inline to avoid changing your app.js structure -->
+  <script>
+    (function(){
+      const key = 'sysdash-theme';
+      const btn = document.getElementById('themeToggle');
+      function apply(mode){
+        document.documentElement.setAttribute('data-theme', mode);
+      }
+      function next(mode){ return mode === 'dark' ? 'light' : mode === 'light' ? 'auto' : 'dark'; }
+      let mode = localStorage.getItem(key) || 'auto';
+      apply(mode);
+      btn && (btn.textContent = mode.charAt(0).toUpperCase() + mode.slice(1));
+      btn && btn.addEventListener('click', () => { mode = next(mode); localStorage.setItem(key, mode); apply(mode); btn.textContent = mode.charAt(0).toUpperCase() + mode.slice(1); });
+    })();
+
+    // Optional: expose small helpers your existing app.js can use
+    window.sysdash = {
+      setMeta: (text) => { const el = document.getElementById('meta'); if (el) el.textContent = text; },
+      markHealthy: (state) => {
+        const ok = document.querySelector('.pill.ok');
+        const w = document.getElementById('warnPill');
+        const b = document.getElementById('badPill');
+        if (!ok || !w || !b) return;
+        ok.style.display = state === 'ok' ? 'inline-flex' : 'none';
+        w.style.display  = state === 'warn' ? 'inline-flex' : 'none';
+        b.style.display  = state === 'bad' ? 'inline-flex' : 'none';
+      },
+      setUptime: (t) => { const el = document.getElementById('uptime'); if (el) el.textContent = t; },
+      clearSkeletons: () => {
+        ['cpuSkeleton','memSkeleton','loadSkeleton','netSkeleton'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.remove('skeleton');
+        });
+      }
+    };
+  </script>
+
+  <!-- Your data/Chart logic -->
+  <script src="app.js"></script>
+</body>
+</html>
