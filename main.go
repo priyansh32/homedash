@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"embed"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io/fs"
 	"log"
@@ -19,6 +21,9 @@ import (
 	"syscall"
 	"time"
 )
+
+//go:embed web/*
+var webFS embed.FS
 
 type CPUTimes struct{ User, Nice, System, Idle, IOWait, IRQ, SoftIRQ, Steal, Guest, GuestNice uint64 }
 
@@ -418,10 +423,27 @@ func main() {
 		}
 	}
 
+	subFS, err := fs.Sub(webFS, "web")
+	if err != nil {
+		log.Fatalf("failed to prepare embedded FS: %v", err)
+	}
+
+	// New: support port flag/env
+	port := flag.String("port", "", "Port to listen on (default 8080 or from SYSDASH_PORT)")
+	flag.Parse()
+
+	addr := ":8081" // default
+	if envPort := os.Getenv("SYSDASH_PORT"); envPort != "" {
+		addr = fmt.Sprintf(":%s", envPort)
+	}
+	if *port != "" {
+		addr = fmt.Sprintf(":%s", *port)
+	}
+
 	go collectLoop()
 
 	mux := http.NewServeMux()
-	mux.Handle("/", http.FileServer(http.Dir("web")))
+	mux.Handle("/", http.FileServer(http.FS(subFS)))
 	mux.HandleFunc("/api/metrics", func(w http.ResponseWriter, r *http.Request) {
 		mtx.RLock()
 		m := current
@@ -438,7 +460,6 @@ func main() {
 		_, _ = w.Write([]byte("ok"))
 	})
 
-	addr := ":8080"
 	log.Printf("sysdashd listening on %s, writing %s/%s (interval %s)", addr, outDir, outFile, sampleEvery)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
