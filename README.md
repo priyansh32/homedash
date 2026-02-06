@@ -1,0 +1,46 @@
+# SysDash
+
+SysDash is a lightweight, real-time Linux system monitoring dashboard. It consists of a single binary backend written in Go and an embedded web frontend using vanilla JavaScript and Chart.js.
+
+## Features
+
+- **Real-time Metrics**: CPU, Memory, Load Averages, and Network Traffic.
+- **Visualizations**: Live updating charts.
+- **System Info**: Kernel version, Uptime, OS details.
+- **Network Interfaces**: Status and IP addresses.
+- **Hardware Temperatures**: CPU/Sensor thermal readings.
+- **Single Binary**: The web assets are embedded, making deployment easy.
+
+## Getting Started
+
+### Prerequisites
+
+- Go 1.16+ (to build)
+- Linux environment (relies on `/proc` and `/sys` filesystems)
+
+### Running Locally
+
+```bash
+# Run directly
+go run main.go
+
+# Or build and run
+go build -o sysdash
+./sysdash
+```
+
+Open your browser to `http://localhost:8081`.
+
+### Configuration
+
+You can configure SysDash using flags or environment variables:
+
+| Env Variable       | Flag    | Default            | Description |
+|--------------------|---------|--------------------|-------------|
+| `SYSDASH_PORT`     | `-port` | `8081`             | Port to listen on |
+| `SYSDASH_INTERVAL` | N/A     | `2s`               | Sampling interval |
+| `SYSDASH_OUTDIR`   | N/A     | `/var/lib/sysdash` | Directory for JSON dump |
+
+## License
+
+MIT

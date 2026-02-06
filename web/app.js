@@ -21,6 +21,12 @@ async function fetchMetrics() {
   return await res.json();
 }
 
+async function fetchHistory() {
+  const res = await fetch('/api/history', { cache: 'no-store' });
+  if (!res.ok) return [];
+  return await res.json();
+}
+
 // --- uptime formatter ---
 function formatUptime(sec) {
   const s = Math.max(0, Math.floor(sec || 0));
@@ -50,16 +56,21 @@ function setUptimeFromMetrics(m) {
 // === charts ===
 let cpuChart, memChart, loadChart, netChart;
 
-function mkLineConfig(label, data, yTitle, suggestedMax) {
+function mkLineConfig(label, data, yTitle, suggestedMax, color) {
+  const c = color || '#3b82f6';
   return {
     type: 'line',
-    data: { labels: state.labels, datasets: [{ label, data, tension: .2, fill: false }] },
+    data: { labels: state.labels, datasets: [{
+      label, data, tension: 0.4, fill: true,
+      borderColor: c, backgroundColor: c + '20',
+      pointRadius: 0, borderWidth: 2
+    }] },
     options: {
       responsive: true,
       animation: false,
       scales: {
-        x: { ticks: { maxTicksLimit: 6 }, grid: { display: false } },
-        y: { beginAtZero: true, suggestedMax, title: { display: !!yTitle, text: yTitle } }
+        x: { ticks: { maxTicksLimit: 6, color: '#6b7280' }, grid: { display: false } },
+        y: { beginAtZero: true, suggestedMax, grid: { color: '#ffffff10' }, ticks: { color: '#6b7280' }, title: { display: !!yTitle, text: yTitle, color: '#6b7280' } }
       },
       plugins: { legend: { display: false } }
     }
@@ -69,28 +80,30 @@ function mkLineConfig(label, data, yTitle, suggestedMax) {
 function mkMultiLineConfig(datasets, yTitle, suggestedMax) {
   return {
     type: 'line',
-    data: { labels: state.labels, datasets: datasets.map(d => ({...d, tension: .2, fill:false})) },
+    data: { labels: state.labels, datasets: datasets.map(d => ({
+      ...d, tension: 0.4, fill: true, pointRadius: 0, borderWidth: 2, backgroundColor: (d.borderColor || '#3b82f6') + '20'
+    })) },
     options: {
       responsive: true, animation: false,
       scales: {
-        x: { ticks: { maxTicksLimit: 6 }, grid:{ display:false } },
-        y: { beginAtZero: true, suggestedMax, title: { display: !!yTitle, text: yTitle } }
+        x: { ticks: { maxTicksLimit: 6, color: '#6b7280' }, grid:{ display:false } },
+        y: { beginAtZero: true, suggestedMax, grid: { color: '#ffffff10' }, ticks: { color: '#6b7280' }, title: { display: !!yTitle, text: yTitle, color: '#6b7280' } }
       }
     }
   };
 }
 
 function initCharts() {
-  cpuChart = new Chart(el('cpuChart'), mkLineConfig('CPU %', state.cpu, '%', 100));
-  memChart = new Chart(el('memChart'), mkLineConfig('Memory Used (MB)', state.memUsed, 'MB'));
+  cpuChart = new Chart(el('cpuChart'), mkLineConfig('CPU %', state.cpu, '%', undefined, '#f43f5e'));
+  memChart = new Chart(el('memChart'), mkLineConfig('Memory Used (MB)', state.memUsed, 'MB', undefined, '#06b6d4'));
   loadChart = new Chart(el('loadChart'), mkMultiLineConfig([
-    { label:'1m', data: state.load1 },
-    { label:'5m', data: state.load5 },
-    { label:'15m', data: state.load15 },
-  ], 'load', 4));
+    { label:'1m', data: state.load1, borderColor: '#fbbf24' },
+    { label:'5m', data: state.load5, borderColor: '#f97316' },
+    { label:'15m', data: state.load15, borderColor: '#ef4444' },
+  ], 'load', undefined));
   netChart = new Chart(el('netChart'), mkMultiLineConfig([
-    { label:'RX bytes', data: state.netRx },
-    { label:'TX bytes', data: state.netTx },
+    { label:'RX bytes', data: state.netRx, borderColor: '#a855f7' },
+    { label:'TX bytes', data: state.netTx, borderColor: '#3b82f6' },
   ], 'bytes'));
 }
 
@@ -133,13 +146,6 @@ function updateState(m) {
     `${m.hostname} • ${m.os} • ${m.kernel} • ${new Date(m.timestamp).toLocaleString()}`;
 
   if (typeof m.uptime_sec === "number") setUptimeFromMetrics(m)
-  // disks
-  // el('disks').innerHTML =
-  //   `<table><tr><th>Mount</th><th>Used</th><th>Total</th><th>%</th></tr>` +
-  //     (m.disks||[]).map(d =>
-  //       `<tr><td class="mono">${d.mountpoint}</td><td>${fmtBytes(d.used_bytes)}</td><td>${fmtBytes(d.total_bytes)}</td><td>${(d.used_pct||0).toFixed(0)}%</td></tr>`
-  //     ).join('') +
-  //   `</table>`;
 
   // net table
   el('netTbl').innerHTML =
@@ -161,7 +167,9 @@ function updateState(m) {
 
 function refreshCharts() {
   cpuChart.update();
-  memChart.options.scales.y.suggestedMax = state.memTotal || undefined;
+  if (state.memTotal) {
+    memChart.options.scales.y.title.text = `MB (Total: ${state.memTotal.toFixed(0)})`;
+  }
   memChart.update();
   loadChart.update();
   netChart.update();
@@ -179,7 +187,12 @@ async function tick() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initCharts();
+  try {
+    const hist = await fetchHistory();
+    if (Array.isArray(hist)) hist.forEach(m => updateState(m));
+    refreshCharts();
+  } catch (e) { console.error(e); }
   tick();
 });

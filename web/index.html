@@ -75,13 +75,13 @@
     /* ---------- Tables ---------- */
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 10px 8px; border-bottom: 1px dashed color-mix(in hsl, var(--line) 70%, transparent); text-align: left; }
-    th { color: var(--muted); font-weight: 600; letter-spacing:.2px; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    th { color: var(--muted); font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px; }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
 
     /* ---------- Status pills ---------- */
-    .pill { display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius: 999px; padding: 6px 10px; font-size:.9rem; background: color-mix(in hsl, var(--card) 85%, transparent); }
-    .ok { color: var(--ok); }
-    .bad { color: var(--bad); }
+    .pill { display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size:.9rem; background: rgba(255,255,255,0.03); }
+    .ok { color: var(--ok); text-shadow: 0 0 10px rgba(74, 222, 128, 0.4); }
+    .bad { color: var(--bad); text-shadow: 0 0 10px rgba(248, 113, 113, 0.4); }
     .warn { color: var(--warn); }
 
     /* ---------- Charts ---------- */
@@ -94,8 +94,8 @@
     .footer { color: var(--muted); text-align:center; padding: 28px 0 8px; font-size:.9rem; }
 
     /* ---------- Skeletons (while app.js loads) ---------- */
-    .skeleton { position: relative; overflow: hidden; background: color-mix(in hsl, var(--card) 85%, transparent); min-height: 220px; border-radius: 12px; }
-    /* .skeleton::after { content:""; position: absolute; inset:0; background: linear-gradient(90deg, transparent, #ffffff10, transparent); animation: shimmer 1.6s infinite; } */
+    .skeleton { position: relative; overflow: hidden; background: rgba(255,255,255,0.02); min-height: 220px; border-radius: 12px; }
+    .skeleton::after { content:""; position: absolute; inset:0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent); animation: shimmer 1.6s infinite; }
     @keyframes shimmer { 0%{ transform: translateX(-100%)} 100%{ transform: translateX(100%)} }
   </style>
   <!-- Chart.js (CDN) -->

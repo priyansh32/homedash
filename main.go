@@ -27,15 +27,6 @@ var webFS embed.FS
 
 type CPUTimes struct{ User, Nice, System, Idle, IOWait, IRQ, SoftIRQ, Steal, Guest, GuestNice uint64 }
 
-type DiskStat struct {
-	Mountpoint string  `json:"mountpoint"`
-	FSType     string  `json:"fstype"`
-	TotalB     uint64  `json:"total_bytes"`
-	FreeB      uint64  `json:"free_bytes"`
-	UsedB      uint64  `json:"used_bytes"`
-	UsedPct    float64 `json:"used_pct"`
-}
-
 type NetStat struct {
 	Name     string `json:"name"`
 	RxBytes  uint64 `json:"rx_bytes"`
@@ -66,7 +57,6 @@ type Metrics struct {
 	MemAvailB  uint64     `json:"mem_available_bytes"`
 	SwapTotalB uint64     `json:"swap_total_bytes"`
 	SwapFreeB  uint64     `json:"swap_free_bytes"`
-	Disks      []DiskStat `json:"disks"`
 	Net        []NetStat  `json:"net"`
 	Temps      []Temp     `json:"temps"`
 	LastError  string     `json:"last_error,omitempty"`
@@ -75,6 +65,7 @@ type Metrics struct {
 var (
 	mtx         sync.RWMutex
 	current     Metrics
+	history     []Metrics
 	outDir      = "/var/lib/sysdash"
 	outFile     = "metrics.json"
 	sampleEvery = 2 * time.Second
@@ -208,46 +199,6 @@ func readKernel() string {
 	return fmt.Sprintf("%s %s", toStr(uts.Sysname), toStr(uts.Release))
 }
 
-func readDisks() []DiskStat {
-	var out []DiskStat
-	seen := map[string]bool{}
-	filepath.WalkDir("/proc/mounts", func(path string, d fs.DirEntry, err error) error { return nil })
-	f, err := os.Open("/proc/mounts")
-	if err != nil {
-		return out
-	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		fields := strings.Fields(sc.Text())
-		if len(fields) < 3 {
-			continue
-		}
-		mp, fstype := fields[1], fields[2]
-		if seen[mp] {
-			continue
-		}
-		seen[mp] = true
-		// skip pseudo filesystems
-		if strings.HasPrefix(fstype, "proc") || strings.HasPrefix(fstype, "sys") || strings.HasPrefix(fstype, "tmpfs") || strings.HasPrefix(fstype, "dev") || strings.HasPrefix(fstype, "cgroup") {
-			continue
-		}
-		var st syscall.Statfs_t
-		if err := syscall.Statfs(mp, &st); err != nil {
-			continue
-		}
-		total := st.Blocks * uint64(st.Bsize)
-		free := st.Bavail * uint64(st.Bsize)
-		used := total - free
-		usedPct := 0.0
-		if total > 0 {
-			usedPct = float64(used) / float64(total) * 100
-		}
-		out = append(out, DiskStat{Mountpoint: mp, FSType: fstype, TotalB: total, FreeB: free, UsedB: used, UsedPct: usedPct})
-	}
-	return out
-}
-
 // tiny helper
 func readUint(path string) uint64 {
 	b, err := os.ReadFile(path)
@@ -364,7 +315,6 @@ func collectLoop() {
 		memT, memA, swT, swF, errM := readMem()
 		l1, l5, l15, errL := readLoad()
 		up, errU := readUptime()
-		disks := readDisks()
 		net := readNet()
 		temps := readTemps()
 
@@ -396,7 +346,6 @@ func collectLoop() {
 			CPUCores:   cores,
 			MemTotalB:  memT, MemAvailB: memA,
 			SwapTotalB: swT, SwapFreeB: swF,
-			Disks: disks,
 			Net:   net,
 			Temps: temps,
 		}
@@ -406,6 +355,10 @@ func collectLoop() {
 
 		mtx.Lock()
 		current = m
+		history = append(history, m)
+		if len(history) > 120 {
+			history = history[1:]
+		}
 		mtx.Unlock()
 		writeJSON(m)
 
@@ -449,6 +402,15 @@ func main() {
 		m := current
 		mtx.RUnlock()
 		b, _ := json.MarshalIndent(m, "", "  ")
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(b)
+	})
+	mux.HandleFunc("/api/history", func(w http.ResponseWriter, r *http.Request) {
+		mtx.RLock()
+		h := make([]Metrics, len(history))
+		copy(h, history)
+		mtx.RUnlock()
+		b, _ := json.MarshalIndent(h, "", "  ")
 		w.Header().Set("Content-Type", "application/json")
 		w.Write(b)
 	})
