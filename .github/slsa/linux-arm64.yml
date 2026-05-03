@@ -1,0 +1,13 @@
+version: 1
+
+goos: linux
+goarch: arm64
+binary: sysdashd-linux-arm64
+
+env:
+  - CGO_ENABLED=0
+flags:
+  - -trimpath
+
+main: ./main.go
+
