@@ -10,4 +10,3 @@ flags:
   - -trimpath
 
 main: ./main.go
-
